@@ -1,0 +1,154 @@
+#!/bin/bash
+#
+#  bdeb : Build Debian (debs) packages of bash scripts  
+# 
+#  Menu script to package bash scripts in APT in format for debian systems
+#
+#  See also brpm -- to build RPM packages of bash scripts.
+#
+
+
+function makeclean {
+    echo -e "\t\n\n Removing previous build files ..."
+    rm -f ${PKG} ${SIG}
+    rm -f *.deb
+    rm -fr ${TAR_LOCATION}
+    rm -fr ${BUILD_LOCATION}
+}
+
+
+function build_tar_archieve {
+    echo -e "\t\n\n Building archive file ${PKG} ..."
+    mkdir -p ${TAR_LOCATION}
+    rm -fr ${BUILD_LOCATION}
+    git archive --output=${PKG} --prefix=${PKG_NAME}/ HEAD
+}
+
+
+
+function git_tag_version {
+    echo -e "\t\n\n Adding a Git version tag ..."
+
+    git tag -a -m "Version v${BASEVERSION}.${GIT_COMMITS}" v${BASEVERSION}.${GIT_COMMITS} 
+    
+    if [[ $? == 0 ]]; then
+        echo -e "\t\n\n Pushing tag to Github. Connecting ..."
+        git push --tags
+    fi
+}
+  
+    
+function sign_package {
+    echo -e "\t\n\n Signing package with GPG key ..."
+    gpg --sign --detach-sign --armor ${PKG}  
+}
+
+
+function create_deb {
+    echo -e "\t\n\n Building Debian package ...\n\n"
+    for dir in ${INSTALL_DIRS}; do mkdir -p ${BUILD_LOCATION}/$dir; done
+    for file in ${INSTALL_FILES}; do cp $file ${BUILD_LOCATION}/$file; done
+    mkdir -p ${DOC_DIR}
+    for docs in ${DOC_FILES}; do cp $docs ${DOC_DIR}/$docs; done
+    fpm -s dir -t deb -C ${BUILD_LOCATION} --name ${NAME} --version ${PROG_VERSION} --prefix ${DESTDIR} --iteration ${GIT_COMMITS} --description "The puppetize pakage"
+    dpkg-deb -c *.deb
+    
+    read -n 1 line
+}
+
+
+function aptitude_update {
+    clear
+    echo -e "\t Updating APT packaging system ..."
+    su -c '/usr/bin/aptitude update && /usr/bin/aptitude safe-upgrade'
+    
+
+}
+
+
+function menu {
+    clear
+    echo
+    echo -e     "\t APT and RPM Packages Tool (arpt)\n"
+    echo -e     "\t 1. Clean previous package builds"
+    echo -e     "\t 2. Build package tar-archieve"
+    echo -e     "\t 3. Deb: Git version tag build"    
+    echo -e     "\t 4. Deb: GPG sign this package (option)"
+    echo -e     "\t 5. Deb: Create the debian APT-package!\n"
+    echo -e     "\t 9. Update APT packages\n"    
+    echo -e     "\t X. Exit program\n\n"
+    echo -en    "\t Enter option: "
+    read -n 1 option
+}
+
+#
+# Program starts here
+#
+
+NAME=puppetize
+
+GIT_COMMITS=`git rev-list HEAD | wc -l`
+GIT_HASH=`git rev-parse --short HEAD`
+
+DIRS='etc lib bin sbin share'
+INSTALL_DIRS=`find ${DIRS} -type d 2>/dev/null`
+INSTALL_FILES=`find ${DIRS} -type f 2>/dev/null`
+
+DOC_FILES='*.txt'
+TAR_LOCATION=tar_archive
+
+# temporary build directory
+BUILD_LOCATION=_build
+DOC_DIR=${BUILD_LOCATION}/share/doc/${PKG_NAME}
+
+
+if [ -f version ]; then
+    BASEVERSION=`cat version`
+else
+    echo -e "\t Missing version file. Terminating ..."
+    exit 1
+fi
+
+
+# Override the system default target location
+# with parameter $1 or the environment DESTDIR 
+DESTDIR=${1:-/opt/debinix}
+
+# Versions
+PROG_VERSION=${BASEVERSION}.${GIT_COMMITS}-${GIT_HASH}
+PKG_NAME=${NAME}-${PROG_VERSION}
+
+# Package name
+PKG=${TAR_LOCATION}/${PKG_NAME}.tar.gz
+SIG=${TAR_LOCATION}/${PKG_NAME}.asc
+
+while [ 1 ]
+do
+    menu
+    case $option in
+    x|X)
+        break ;;
+    1)
+        makeclean ;;
+    2)
+        build_tar_archieve ;;
+    3)
+        git_tag_version ;;        
+    4)
+        sign_package ;;
+    5)
+        create_deb ;;
+    9)
+        aptitude_update ;;
+        
+    *)
+        clear
+        echo "Sorry, wrong selection" ;;
+    esac
+    echo -en "\n\t Hit any key continue ..."
+    read -n 1 line
+done
+
+echo -e "\n\nThank you, terminating script ...\n"
+
+
