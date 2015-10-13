@@ -11,8 +11,8 @@ PKG_NAME=$(NAME)-$(VERSION)
 PKG=$(PKG_DIR)/$(PKG_NAME).tar.gz
 SIG=$(PKG_DIR)/$(PKG_NAME).asc
 
-PREFIX?=/usr/local
-DOC_DIR=$(PREFIX)/share/doc/$(PKG_NAME)
+DESTDIR?=/usr/local
+DOC_DIR=$(DESTDIR)/share/doc/$(PKG_NAME)
 
 pkg:
 	rm -fr $(PKG_DIR)
@@ -43,13 +43,13 @@ tag:
 release: $(PKG) $(SIG) tag
 
 install:
-	for dir in $(INSTALL_DIRS); do mkdir -p $(PREFIX)/$$dir; done
-	for file in $(INSTALL_FILES); do cp $$file $(PREFIX)/$$file; done
+	for dir in $(INSTALL_DIRS); do mkdir -p $(DESTDIR)/$$dir; done
+	for file in $(INSTALL_FILES); do cp $$file $(DESTDIR)/$$file; done
 	mkdir -p $(DOC_DIR)
 	cp -r $(DOC_FILES) $(DOC_DIR)/
 
 uninstall:
-	for file in $(INSTALL_FILES); do rm -f $(PREFIX)/$$file; done
+	for file in $(INSTALL_FILES); do rm -f $(DESTDIR)/$$file; done
 	rm -rf $(DOC_DIR)
 
 
