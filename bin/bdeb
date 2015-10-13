@@ -7,6 +7,11 @@
 #  See also brpm -- to build RPM packages of bash scripts.
 #
 
+function clean_stdin()
+{
+    while read -e -t 0.1; do : ; done
+}
+
 
 function makeclean {
     echo -e "\t\n\n Removing previous build files ..."
@@ -14,6 +19,7 @@ function makeclean {
     rm -f *.deb
     rm -fr ${TAR_LOCATION}
     rm -fr ${BUILD_LOCATION}
+    clean_stdin
 }
 
 
@@ -22,6 +28,7 @@ function build_tar_archieve {
     mkdir -p ${TAR_LOCATION}
     rm -fr ${BUILD_LOCATION}
     git archive --output=${PKG} --prefix=${PKG_NAME}/ HEAD
+    clean_stdin
 }
 
 
@@ -35,12 +42,14 @@ function git_tag_version {
         echo -e "\t\n\n Pushing tag to Github. Connecting ..."
         git push --tags
     fi
+    clean_stdin
 }
   
     
 function sign_package {
     echo -e "\t\n\n Signing package with GPG key ..."
-    gpg --sign --detach-sign --armor ${PKG}  
+    gpg --sign --detach-sign --armor ${PKG}
+    clean_stdin
 }
 
 
@@ -53,7 +62,7 @@ function create_deb {
     fpm -s dir -t deb -C ${BUILD_LOCATION} --name ${NAME} --version ${PROG_VERSION} --prefix ${DESTDIR} --iteration ${GIT_COMMITS} --description "The puppetize pakage"
     dpkg-deb -c *.deb
     
-    read -n 1 line
+    clean_stdin
 }
 
 
@@ -62,6 +71,7 @@ function aptitude_update {
     echo -e "\t Updating APT packaging system ..."
     su -c '/usr/bin/aptitude update && /usr/bin/aptitude safe-upgrade'
     
+    clean_stdin
 
 }
 
@@ -69,13 +79,13 @@ function aptitude_update {
 function menu {
     clear
     echo
-    echo -e     "\t APT and RPM Packages Tool (arpt)\n"
+    echo -e     "\t Build Debian (bdeb version $BASEVERSION)\n"
     echo -e     "\t 1. Clean previous package builds"
     echo -e     "\t 2. Build package tar-archieve"
-    echo -e     "\t 3. Deb: Git version tag build"    
-    echo -e     "\t 4. Deb: GPG sign this package (option)"
-    echo -e     "\t 5. Deb: Create the debian APT-package!\n"
-    echo -e     "\t 9. Update APT packages\n"    
+    echo -e     "\t 3. Tag this build with Git version"    
+    echo -e     "\t 4. Sign this package with GPG key(option)"
+    echo -e     "\t 5. Create the Debian-package!\n"
+    echo -e     "\t 9. Aptitude update and upgrade all system packages\n"    
     echo -e     "\t X. Exit program\n\n"
     echo -en    "\t Enter option: "
     read -n 1 option
@@ -102,8 +112,8 @@ BUILD_LOCATION=_build
 DOC_DIR=${BUILD_LOCATION}/share/doc/${PKG_NAME}
 
 
-if [ -f version ]; then
-    BASEVERSION=`cat version`
+if [ -f ../VERSION.txt ]; then
+    BASEVERSION=`cat ../VERSION.txt`
 else
     echo -e "\t Missing version file. Terminating ..."
     exit 1
